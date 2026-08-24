@@ -47,9 +47,11 @@ const ATTR_RE = /^(\s+)(CHECK|EXPECT|EVIDENCE|CWD):\s?(.*)$/;
 const UNINDENTED_ATTR_RE = /^(CHECK|EXPECT|EVIDENCE|CWD):\s?(.*)$/;
 const ABANDON_RE = /^ABANDON:\s*(\S*)\s*(.*)$/;
 const OWNS_RE = /^OWNS:\s*(.*)$/;
+const NEEDS_SCOPE_RE = /^NEEDS-SCOPE:\s*(.*)$/;
 const FENCE_OPEN_RE = /^( {0,3})(`{3,}|~{3,})(.*)$/;
 const REGEX_RE = /^\/([\s\S]*)\/([a-z]*)$/;
 const SCOPE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+const REF_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 function parseRegex(expect) {
   const match = String(expect).match(REGEX_RE);
@@ -75,6 +77,7 @@ export function parseGates(text, options = {}) {
   const gates = [];
   const abandoned = new Map();
   const owns = [];
+  const needsScope = [];
   const errors = [];
   const warnings = [];
   const ids = new Map();
@@ -185,6 +188,41 @@ export function parseGates(text, options = {}) {
       }
       continue;
     }
+
+    const needsMatch = line.match(NEEDS_SCOPE_RE);
+    if (needsMatch) {
+      if (seenGate) {
+        errors.push("line " + (index + 1) + ": NEEDS-SCOPE must appear before the first gate");
+        current = null;
+        continue;
+      }
+      const declared = needsMatch[1].split(",").map((item) => item.trim()).filter(Boolean);
+      if (!declared.length) errors.push("line " + (index + 1) + ": NEEDS-SCOPE declares no references");
+      for (const item of declared) {
+        const parts = item.split(":").map((part) => part.trim());
+        if (parts.length !== 3 || parts.some((part) => !part)) {
+          errors.push("line " + (index + 1) + ": malformed NEEDS-SCOPE reference \"" + item +
+            "\"; expected scope:ledger-stem:gate-id");
+          continue;
+        }
+        const [refScope, refStem, refGate] = parts;
+        if (!SCOPE_RE.test(refScope)) {
+          errors.push("line " + (index + 1) + ": NEEDS-SCOPE scope must match " + SCOPE_RE + ": " + item);
+          continue;
+        }
+        if (!REF_ID_RE.test(refStem)) {
+          errors.push("line " + (index + 1) + ": NEEDS-SCOPE ledger stem must match " + REF_ID_RE + ": " + item);
+          continue;
+        }
+        if (!REF_ID_RE.test(refGate)) {
+          errors.push("line " + (index + 1) + ": NEEDS-SCOPE gate id must match " + REF_ID_RE + ": " + item);
+          continue;
+        }
+        needsScope.push({ scope: refScope, stem: refStem, gate: refGate });
+      }
+      current = null;
+      continue;
+    }
     if (/^#|^- /.test(line)) current = null;
   }
 
@@ -211,7 +249,7 @@ export function parseGates(text, options = {}) {
   }
   if (options.requireGates !== false && gates.length === 0) errors.push("ledger contains zero live gates");
 
-  return { lines, eol, finalNewline, gates, abandoned, owns, errors, warnings };
+  return { lines, eol, finalNewline, gates, abandoned, owns, needsScope, errors, warnings };
 }
 
 export function formatDocument(doc) {

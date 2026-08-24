@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Compare ledgers over time and manage the consequences of oracle change.
-// Zero dependencies. Node 16+.
+// Track ledger changes and manage oracle invalidation over time.
+// Zero runtime dependencies. Requires Node.js 16+.
 //
 //   gates-diff.mjs diff OLD NEW
 //       Report added, removed, oracle-changed, abandonment-changed, and

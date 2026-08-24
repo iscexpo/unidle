@@ -1,8 +1,10 @@
-# unidle
+# unidle: completion gates for AI coding agents
 
-## Make incomplete work visible. Make completion testable.
+## Make autonomous software development verifiable.
 
-`unidle` is a zero-dependency Node.js skill and gate runner for substantial autonomous work. It turns a vague "done" into a small, inspectable contract: define outcomes, decompose the work, run approved checks, re-verify the evidence, and report what remains.
+`unidle` is a zero-dependency Node.js skill, CLI, and verification workflow for AI coding agents and substantial autonomous software development. It turns a vague "done" into an inspectable completion contract: define acceptance criteria, decompose work, run approved checks, re-verify evidence, and report what remains.
+
+Use unidle for agentic coding workflows, multi-step implementation tasks, deep code reviews, release verification, and CI pipelines that need more than a green process exit.
 
 <p align="center">
 	<strong>PLAN</strong>
@@ -27,13 +29,13 @@ graph LR
     F -.->|stale evidence| D
 ```
 
-## The problem
+## Why unidle
 
 Agents are good at producing activity. Activity is not completion.
 
 Unidle makes the difference structural. A checked box without current evidence is still unmet. A command is not trusted merely because it exists. A successful leaf is not integrated until its parent verifies it again.
 
-## The contract
+## Acceptance gates
 
 Every gate is an observable outcome with an optional executable oracle:
 
@@ -68,7 +70,7 @@ node scripts/gate-check.mjs --approve GATES.md
 
 For a focused task, use **Solo** mode. For independent deliverables, create a Depth Tree with one ledger per leaf and branch, then use ownership leases and parent re-verification. The full workflow is in [`SKILL.md`](SKILL.md).
 
-## One system, several views
+## Features and commands
 
 | Surface | What it answers | Entry point |
 | --- | --- | --- |

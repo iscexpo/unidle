@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // diff-tests.mjs : behavioural tests for gates-diff.mjs.
-// Zero dependencies, cross-platform (no CHECK is ever executed here).
+// Zero dependencies, cross-platform (fixtures never run CHECK commands).
 //
 //   node tests/diff-tests.mjs [filter]
 //

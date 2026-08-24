@@ -88,6 +88,32 @@ node <skill-dir>/scripts/gate-check.mjs --scope api --release
 
 An unknown `--leaf` is an error. The checker never silently falls back to the first ledger.
 
+## Cross-scope dependencies
+
+A ledger can declare that it must stay WAITING until gates in other pipelines are met. Declare references before the first gate, in the same region as `OWNS`:
+
+```markdown
+NEEDS-SCOPE: auth:GATES:g3, infra:gates/leaf-2.1.md:g1
+```
+
+Each reference names `<scope>:<ledger-stem>:<gate-id>`. The stem resolves to `.unidle/<scope>/GATES.md` when it is `GATES`, otherwise to `.unidle/<scope>/gates/<stem>.md`. Malformed references, invalid ids, and directives placed after the first gate are parse errors.
+
+Verification is fail-closed and reads live states from disk:
+
+- A referenced gate that is not `met` blocks the ledger: no CHECK from it executes, `--status` reports `WAITING`, and the exit code is 1.
+- A missing dependency ledger, an unparseable one, or a reference to a nonexistent gate is a usage failure (exit 2), never a pass.
+- There is no transitive closure. If A needs B and B needs C, A's verification looks at B's recorded states as they are on disk; verify B before integrating A, exactly as the driver loop already requires for leaves.
+
+Ownership globs stay repository-relative across scopes, so disjointness checking works globally without change. Render the whole graph with:
+
+```text
+node <skill-dir>/scripts/gate-check.mjs --scope-tree
+```
+
+The tree lists every pipeline with its ledgers and outgoing edges and detects cycles over the scope graph. A cycle is not a deadlock — disk states decide — but it is a plan smell; restructure the decomposition instead of relying on it.
+
+Run modes accept a comma-separated `--scope ID,ID` list to verify several pipelines in one invocation. Pipeline actions (`--claim`, `--release`, `--log`, `--bind`) still bind to exactly one scope.
+
 ## Concurrent ledger updates
 
 The checker serializes each gate-file update and commits it atomically. Before applying a completed check, it re-reads the ledger and confirms that the gate id and oracle fields still match what ran. If the command, expectation, working directory, or other bound oracle field changed in flight, the stale result is discarded.

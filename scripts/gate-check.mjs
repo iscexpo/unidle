@@ -12,7 +12,7 @@ import { homedir } from "node:os";
 import {
   UNIDLE_DIR, appendStatus, claimLeases, formatDocument, gateState,
   hookStatePath, listScopes, parseGates, qualify, releaseLeases, resolveTarget,
-  scopeRoot, sha256, sleep, tail, validateScopeId, withFileLock, writeAtomic,
+  scopeFiles, scopeRoot, sha256, sleep, tail, validateScopeId, withFileLock, writeAtomic,
 } from "./lib/gates.mjs";
 import { createOracle, createRunner, DEFAULT_TIMEOUT_SECONDS, resolveShellOrThrow } from "./lib/runner.mjs";
 
@@ -34,11 +34,17 @@ pipeline actions:
   --log TEXT --scope ID              append one status line
   --bind SESSION --scope ID          bind a session to one pipeline
   --list-scopes                      list .unidle pipelines
+  --scope-tree                       list pipelines and NEEDS-SCOPE edges
 
 targeting:
-  --scope ID             use .unidle/ID (or UNIDLE_SCOPE)
+  --scope ID             use .unidle/ID (or UNIDLE_SCOPE); run modes accept a
+                         comma-separated list (ID,ID) of pipelines
   --root DIR             repository/pipeline root (default current directory)
   file ...               explicit regular ledger files; all are honored
+
+A ledger may declare dependencies before its first gate:
+NEEDS-SCOPE: <scope>:<ledger-stem>:<gate-id>, ...
+It stays WAITING: no CHECK runs while any referenced gate is not met.
 
 CHECK execution requires prior approval keyed to the exact CHECK, EXPECT,
 resolved CWD, resolved shell, timeout, output/regex limits, platform, and PATH.
@@ -49,7 +55,7 @@ exit codes: 0 all met/action succeeded; 1 unmet; 2 usage/parse/infrastructure;
 
 const FLAG_OPTIONS = new Set([
   "--status", "--reverify", "--approve", "--claim", "--release",
-  "--list-scopes", "--help", "-h",
+  "--list-scopes", "--scope-tree", "--help", "-h",
 ]);
 const VALUE_OPTIONS = new Set([
   "--scope", "--leaf", "--timeout", "--jobs", "--cwd", "--root",
@@ -128,7 +134,7 @@ if (opt.help || opt.h) {
 }
 
 const actionNames = [];
-for (const key of ["claim", "release", "list-scopes"]) if (opt[key]) actionNames.push("--" + key);
+for (const key of ["claim", "release", "list-scopes", "scope-tree"]) if (opt[key]) actionNames.push("--" + key);
 for (const key of ["log", "bind"]) if (opt[key] !== undefined) actionNames.push("--" + key);
 if (actionNames.length > 1) failUsage("pipeline actions are mutually exclusive: " + actionNames.join(", "));
 const action = actionNames[0] || null;
@@ -156,12 +162,72 @@ if (action === "--list-scopes") {
   process.exit(0);
 }
 
-if (opt.scope) {
+if (action === "--scope-tree") {
+  const scopes = listScopes(root);
+  if (!scopes.length) {
+    console.log("(no pipelines under " + UNIDLE_DIR + "/)");
+    process.exit(0);
+  }
+  const scopeEdges = new Map();
+  for (const scopeName of scopes) {
+    console.log("scope " + scopeName);
+    const edges = [];
+    for (const file of scopeFiles(root, scopeName)) {
+      const doc = parseGates(readFileSync(file, "utf8"));
+      const suffix = doc.errors.length ? "; parse errors" : "";
+      const label = relative(root, file).split(sep).join("/");
+      console.log("  " + label + " (" + doc.gates.length + " gates" + suffix + ")");
+      for (const ref of doc.needsScope) {
+        console.log("    -> " + ref.scope + ":" + ref.stem + ":" + ref.gate);
+        edges.push(ref.scope);
+      }
+    }
+    scopeEdges.set(scopeName, [...new Set(edges)]);
+  }
+  // Cycle detection over the scope-level dependency graph. Verification reads
+  // live states from disk, so a cycle is not a deadlock, but it is a plan smell.
+  const colour = new Map();
+  const stack = [];
+  let cycle = null;
+  const visit = (node) => {
+    if (cycle || colour.get(node) === "done") return;
+    if (colour.get(node) === "active") { cycle = [...stack, node]; return; }
+    colour.set(node, "active");
+    stack.push(node);
+    for (const next of scopeEdges.get(node) || []) visit(next);
+    stack.pop();
+    colour.set(node, "done");
+  };
+  for (const scopeName of scopes) visit(scopeName);
+  if (cycle) console.log("CYCLE: " + cycle.join(" -> "));
+  else console.log("NO CYCLES");
+  process.exit(0);
+}
+
+// A comma-separated --scope list is a run-mode convenience for verifying
+// several pipelines in one invocation; pipeline actions still bind to one.
+const requestedScopes = opt.scope ? String(opt.scope).split(",").map((item) => item.trim()).filter(Boolean) : null;
+if (requestedScopes && requestedScopes.length > 1) {
+  if (action || fileArgs.length) failUsage("comma-separated --scope is only valid with run modes and no explicit files");
+  const invalid = requestedScopes.map((item) => validateScopeId(item)).find(Boolean);
+  if (invalid) failUsage(invalid);
+}
+if (opt.scope && requestedScopes.length === 1) {
   const error = validateScopeId(opt.scope);
   if (error) failUsage(error);
 }
 
-let target = resolveTarget({ root, scope: opt.scope, files: fileArgs });
+let target;
+let scopeLabel = opt.scope || null;
+if (requestedScopes && requestedScopes.length > 1) {
+  const scopes = listScopes(root);
+  const missing = requestedScopes.filter((item) => !scopes.includes(item));
+  if (missing.length) failUsage("no such scope(s): " + missing.join(", ") + " (have: " + (scopes.join(", ") || "none") + ")");
+  scopeLabel = requestedScopes.join(",");
+  target = { mode: "multi", scope: null, files: requestedScopes.flatMap((item) => scopeFiles(root, item)) };
+} else {
+  target = resolveTarget({ root, scope: opt.scope, files: fileArgs });
+}
 // A deleted/crashed pipeline can leave coordination leases behind after its
 // ledger directory is gone. An explicit, validated release target must remain
 // usable for that recovery path; claims still require a live exact ledger.
@@ -169,6 +235,7 @@ if (target.error && action === "--release" && opt.scope) {
   target = { mode: "scope", scope: opt.scope, files: [] };
 } else if (target.error) failUsage(target.error);
 const scope = target.scope;
+if (!scopeLabel && scope) scopeLabel = scope;
 
 if (action === "--log") {
   if (!scope) failUsage("--log needs --scope ID or exactly one discoverable pipeline");
@@ -266,6 +333,54 @@ if (action === "--claim" || action === "--release") {
 }
 
 let ledgers = target.files.map(loadLedger);
+
+// Cross-scope dependency verification. A ledger with NEEDS-SCOPE references
+// stays WAITING: nothing from it executes while any referenced gate is not
+// met. Verification reads live states from disk, so it is fail-closed and has
+// no transitive closure to maintain; --scope-tree renders the graph instead.
+function foreignLedgerPath(ref) {
+  const base = join(root, UNIDLE_DIR, ref.scope);
+  return ref.stem === "GATES" ? join(base, "GATES.md") : join(base, "gates", ref.stem + ".md");
+}
+
+const blockedLedgers = [];
+for (const ledger of ledgers) {
+  if (!ledger.doc.needsScope.length) continue;
+  const blocked = [];
+  for (const ref of ledger.doc.needsScope) {
+    if (!existsSync(join(root, UNIDLE_DIR, ref.scope))) {
+      console.error("gate-check: warning: NEEDS-SCOPE references unknown scope \"" + ref.scope + "\"");
+    }
+    const path = foreignLedgerPath(ref);
+    let foreignText;
+    try { foreignText = readFileSync(path, "utf8"); }
+    catch { failUsage("dependency ledger not found for " + basename(ledger.file) + ": " + ref.scope + ":" + ref.stem + ":" + ref.gate + " (looked for " + path + ")"); }
+    const foreignDoc = parseGates(foreignText);
+    if (foreignDoc.errors.length) {
+      failUsage("dependency ledger has parse errors: " + path + ": " + foreignDoc.errors[0]);
+    }
+    const foreignGate = foreignDoc.gates.find((candidate) => candidate.id === ref.gate);
+    if (!foreignGate) {
+      failUsage("dependency gate not found in " + path + ": " + ref.scope + ":" + ref.stem + ":" + ref.gate);
+    }
+    const state = gateState(foreignGate, foreignDoc.abandoned);
+    if (state !== "met") blocked.push({ ref, state });
+  }
+  if (blocked.length) blockedLedgers.push({ ledger, blocked });
+}
+
+if (blockedLedgers.length) {
+  for (const { ledger, blocked } of blockedLedgers) {
+    console.log("WAITING " + basename(ledger.file) + " (" + blocked.length + " unmet dependenc" +
+      (blocked.length === 1 ? "y" : "ies") + ")");
+    for (const { ref, state } of blocked) {
+      console.log("  BLOCKED BY " + ref.scope + ":" + ref.stem + ":" + ref.gate + " (" + state + ")");
+    }
+  }
+  console.log("DEPENDENCIES UNMET: nothing executed; satisfy the referenced gates first" +
+    (scopeLabel ? " [scope " + scopeLabel + "]" : ""));
+  process.exit(1);
+}
 
 const shell = opt.status ? "(not used: status mode)" : (() => {
   try { return resolveShellOrThrow(opt.shell); }
@@ -507,7 +622,7 @@ for (const ledger of ledgers) {
   console.log(basename(ledger.file) + ": " + ledger.doc.gates.length + " gates");
 }
 
-const where = scope ? " [scope " + scope + "]" : "";
+const where = scopeLabel ? " [scope " + scopeLabel + "]" : "";
 const verifyNote = opt.reverify
   ? ", reran: " + results.length + ", previously met reverified: " + reverified
   : "";
