@@ -93,6 +93,17 @@ Make a ledger require its own quality by linting as a gate:
 
 Name the ledger path the checker will resolve from its default working directory; a scoped leaf names its own path under `.unidle/<scope>/gates/`.
 
+## Author with the wizard
+
+For a new pipeline, prefer the guided flow over hand-editing:
+
+```text
+node <skill-dir>/scripts/wizard.mjs
+node <skill-dir>/scripts/wizard.mjs --from-json spec.json   # scripted runs
+```
+
+The wizard interviews for the scope name, `OWNS:` paths, optional `NEEDS-SCOPE` references, and gates. It fail-closes on every mistake that would bite later: ownership globs are overlap-checked against every existing declaration, dependency references must resolve to a real ledger and gate on disk, runnable gates need both halves of their oracle, and the draft must lint without errors before anything is written. Runnable oracles are sampled through the real runner first so you see `MET`/`UNMET` — preview only, nothing recorded — before confirming the write to `.unidle/<scope>/GATES.md`. Existing ledgers are never recreated; edit those directly.
+
 ## Approval boundary
 
 `CHECK:` is executable shell code with the permissions and inherited environment of the checker. Parse inherited ledgers with `--status` and read their source. A normal run without an existing approval prints each resolved oracle and leaves it unexecuted. Execute only with explicit `--approve` after reviewing every command and called script.
