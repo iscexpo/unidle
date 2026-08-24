@@ -61,18 +61,25 @@ export function safeRegexMatch(expectation, output) {
   return new Promise((done) => {
     const worker = new Worker(new URL("./regex-worker.mjs", import.meta.url));
     let settled = false;
+    let timer = null;
     const finish = (value) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       worker.terminate().catch(() => {});
       done(value);
     };
-    const timer = setTimeout(() => finish({ matched: false, error: "EXPECT regex exceeded " + REGEX_TIMEOUT_MS + "ms" }), REGEX_TIMEOUT_MS);
+    // The deadline bounds runaway MATCHING, so it starts once the worker is
+    // executing JavaScript -- not during thread cold-start, which on some
+    // platforms can otherwise consume the entire budget for a trivial match.
+    worker.once("online", () => {
+      timer = setTimeout(() =>
+        finish({ matched: false, error: "EXPECT regex exceeded " + REGEX_TIMEOUT_MS + "ms" }), REGEX_TIMEOUT_MS);
+      worker.postMessage({ source: expectation.source, flags: expectation.flags, output });
+    });
     worker.once("message", (message) => finish(message));
     worker.once("error", (error) => finish({ matched: false, error: error.message }));
     worker.once("exit", (code) => { if (code !== 0) finish({ matched: false, error: "EXPECT worker exited " + code }); });
-    worker.postMessage({ source: expectation.source, flags: expectation.flags, output });
   });
 }
 
