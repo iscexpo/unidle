@@ -1,13 +1,13 @@
 # The Depth Tree
 
-Use the tree to expose natural work boundaries and integration points. Do not treat depth as an arithmetic promise about effort or tokens.
+Use the tree to expose natural work boundaries and integration points. Do not treat depth as an arithmetic promise about effort or token use.
 
 The original v1 method claimed that each binary split multiplied effort. A small maintainer-run comparison later suggested that agents treated depth as a thoroughness cue rather than following that arithmetic. The repository does not contain the raw artifacts needed to reproduce those historical figures, so treat them as design history, not benchmark evidence. See [../research/validation-protocol.md](../research/validation-protocol.md).
 
 ## Rules
 
 1. **Make layer 1 the requested task.** Split only at real domain, component, or verification boundaries. Binary splits are optional.
-2. **Make each leaf one coherent deliverable.** Give it exact ownership, dependencies, and acceptance gates. Merge tiny adjacent leaves; split a leaf that hides several independent outcomes.
+2. **Make each leaf one coherent deliverable.** Give it explicit ownership, dependencies, and acceptance gates. Merge tiny adjacent leaves; split a leaf that hides several independent outcomes.
 3. **Fix contracts before fan-out.** Record interfaces, formats, shared assumptions, error conventions, naming, and ownership in `PLAN.md` before a leaf starts.
 4. **Give branches integration gates.** Verify child ledgers again, then test interfaces, end-to-end behavior, and regressions across the joined work.
 5. **Use gates and passes as the effort control.** Finish implementation, expert reread, defect hunt, and low-cost polish. Stop only when every required gate has current evidence and another improvement pass finds nothing.
@@ -40,7 +40,7 @@ Do not let two concurrent leaves own the same path. If shared work cannot be sep
 | Layer | Proof |
 |---|---|
 | Leaf | Current runnable evidence plus reviewed manual evidence |
-| Branch | Reverified children plus cross-child integration checks |
+| Branch | Re-verified children plus cross-child integration checks |
 | Root | Every branch integrated, regressions checked, final claims remeasured |
 
 Local completion does not imply integration. Verify from leaves upward and report only after the root ledger is satisfied.

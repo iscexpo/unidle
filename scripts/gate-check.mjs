@@ -6,8 +6,6 @@ import {
   closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync,
   statSync, unlinkSync, writeFileSync,
 } from "node:fs";
-import { spawn } from "node:child_process";
-import { Worker } from "node:worker_threads";
 import { randomBytes } from "node:crypto";
 import { delimiter, dirname, basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { homedir } from "node:os";
@@ -16,6 +14,7 @@ import {
   hookStatePath, listScopes, parseGates, qualify, releaseLeases, resolveTarget,
   scopeRoot, sha256, sleep, tail, validateScopeId, withFileLock, writeAtomic,
 } from "./lib/gates.mjs";
+import { createOracle, createRunner } from "./lib/runner.mjs";
 
 const HELP = `usage: gate-check.mjs [options] [file ...]
 
@@ -56,8 +55,6 @@ const VALUE_OPTIONS = new Set([
   "--scope", "--leaf", "--timeout", "--jobs", "--cwd", "--root",
   "--log", "--bind", "--shell",
 ]);
-const MAX_OUTPUT_BYTES = 1024 * 1024;
-const REGEX_TIMEOUT_MS = 250;
 const DEFAULT_TIMEOUT_SECONDS = 120;
 
 function parseArgs(argv) {
@@ -309,21 +306,7 @@ function resolvedGateCwd(gate, file) {
   return gate.cwd ? resolve(base, gate.cwd) : base;
 }
 
-function oracle(file, gate) {
-  const cwd = resolvedGateCwd(gate, file);
-  return {
-    schema: 1,
-    check: gate.check,
-    expect: gate.expect,
-    cwd,
-    shell,
-    timeoutMs: timeoutSeconds * 1000,
-    maxOutputBytes: MAX_OUTPUT_BYTES,
-    regexTimeoutMs: REGEX_TIMEOUT_MS,
-    platform: process.platform,
-    path: pathValue,
-  };
-}
+const oracle = createOracle({ shell, timeoutSeconds, pathValue, resolveCwd: resolvedGateCwd });
 
 function signature(file, gate) {
   return sha256(JSON.stringify(oracle(file, gate)));
@@ -403,123 +386,7 @@ function printOracle(file, gate, prefix) {
   console.log("    PATH: " + pathTranscript);
 }
 
-function safeRegexMatch(expectation, output) {
-  if (expectation.kind === "text") return Promise.resolve({ matched: output.includes(expectation.value) });
-  return new Promise((done) => {
-    const worker = new Worker(new URL("./lib/regex-worker.mjs", import.meta.url));
-    let settled = false;
-    const finish = (value) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      worker.terminate().catch(() => {});
-      done(value);
-    };
-    const timer = setTimeout(() => finish({ matched: false, error: "EXPECT regex exceeded " + REGEX_TIMEOUT_MS + "ms" }), REGEX_TIMEOUT_MS);
-    worker.once("message", (message) => finish(message));
-    worker.once("error", (error) => finish({ matched: false, error: error.message }));
-    worker.once("exit", (code) => { if (code !== 0) finish({ matched: false, error: "EXPECT worker exited " + code }); });
-    worker.postMessage({ source: expectation.source, flags: expectation.flags, output });
-  });
-}
-
-function runCheck(task) {
-  return new Promise((done) => {
-    const chunks = { stdout: [], stderr: [] };
-    let bytes = 0;
-    let overflow = false;
-    let timedOut = false;
-    let spawnError = null;
-    let closed = false;
-    let closeStreamsTimer = null;
-    let child;
-
-    const stopChild = () => {
-      if (closeStreamsTimer) return;
-      try {
-        if (process.platform === "win32") child.kill("SIGKILL");
-        else process.kill(-child.pid, "SIGKILL");
-      } catch {
-        try { child.kill("SIGKILL"); } catch { /* already gone */ }
-      }
-      // A descendant that escaped the shell can otherwise keep inherited pipes
-      // open forever. We still settle through the child's close event, after
-      // giving stdio a short grace period to drain.
-      closeStreamsTimer = setTimeout(() => {
-        try { child.stdout.destroy(); } catch { /* closed */ }
-        try { child.stderr.destroy(); } catch { /* closed */ }
-      }, 1000);
-    };
-
-    const capture = (stream, chunk) => {
-      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      const remaining = MAX_OUTPUT_BYTES - bytes;
-      if (remaining > 0) chunks[stream].push(buffer.subarray(0, remaining));
-      bytes += buffer.length;
-      if (bytes > MAX_OUTPUT_BYTES && !overflow) {
-        overflow = true;
-        stopChild();
-      }
-    };
-
-    try {
-      child = spawn(task.gate.check, {
-        cwd: task.cwd,
-        shell,
-        windowsHide: true,
-        detached: process.platform !== "win32",
-        env: process.env,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-    } catch (error) {
-      done({ ...task, ok: false, output: "", exitCode: null, signal: null, matched: false, error: error.message });
-      return;
-    }
-    child.stdout.on("data", (chunk) => capture("stdout", chunk));
-    child.stderr.on("data", (chunk) => capture("stderr", chunk));
-    child.once("error", (error) => { spawnError = error; });
-    const timer = setTimeout(() => {
-      timedOut = true;
-      stopChild();
-    }, timeoutSeconds * 1000);
-    child.once("close", async (exitCode, signal) => {
-      if (closed) return;
-      closed = true;
-      clearTimeout(timer);
-      if (closeStreamsTimer) clearTimeout(closeStreamsTimer);
-      const stdout = Buffer.concat(chunks.stdout).toString("utf8");
-      const stderr = Buffer.concat(chunks.stderr).toString("utf8");
-      const output = stdout + (stdout && stderr ? "\n" : "") + stderr;
-      const match = timedOut || overflow || spawnError
-        ? { matched: false }
-        : await safeRegexMatch(task.gate.expectation, output);
-      const error = timedOut ? "timed out after " + timeoutSeconds + "s"
-        : overflow ? "output exceeded " + MAX_OUTPUT_BYTES + " bytes"
-          : spawnError ? spawnError.message
-            : match.error || null;
-      done({
-        ...task, output, exitCode, signal, matched: Boolean(match.matched), error,
-        ok: !error && exitCode === 0 && Boolean(match.matched),
-      });
-    });
-  });
-}
-
-async function runRolling(tasks, limit) {
-  const results = new Array(tasks.length);
-  let next = 0;
-  async function worker() {
-    for (;;) {
-      const index = next++;
-      if (index >= tasks.length) return;
-      results[index] = await runCheck(tasks[index]);
-    }
-  }
-  const workers = [];
-  for (let index = 0; index < Math.min(limit, tasks.length); index++) workers.push(worker());
-  await Promise.all(workers);
-  return results;
-}
+const { runRolling } = createRunner({ shell, timeoutSeconds });
 
 const pending = [];
 for (const ledger of ledgers) {

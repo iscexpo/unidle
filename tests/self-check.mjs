@@ -22,6 +22,8 @@ const SCRIPTS = [
   "scripts/install-hooks.mjs",
   "scripts/lib/gates.mjs",
   "scripts/lib/regex-worker.mjs",
+  "scripts/lib/runner.mjs",
+  "scripts/lib/lint-rules.mjs",
   "tests/run-tests.mjs",
   "tests/hardening-tests.mjs",
   "tests/stress-tests.mjs",
@@ -70,7 +72,7 @@ check("gate files are written atomically", () => {
 });
 
 check("checks wait for close and cap output", () => {
-  const src = read("scripts/gate-check.mjs");
+  const src = read("scripts/lib/runner.mjs");
   if (!src.includes('child.once("close"')) return "gate runner does not settle on stdio close";
   if (src.includes('child.once("exit"')) return "gate runner settles on exit before stdio close";
   if (!src.includes("MAX_OUTPUT_BYTES")) return "gate runner has no explicit output cap";
@@ -78,7 +80,10 @@ check("checks wait for close and cap output", () => {
 });
 
 check("approval identity binds execution semantics", () => {
-  const src = read("scripts/gate-check.mjs");
+  // The oracle object now lives in lib/runner.mjs; the checker wires it to
+  // resolved CWD, shell, and PATH. Both files together must name every
+  // dimension the approval signature hashes.
+  const src = read("scripts/gate-check.mjs") + "\n" + read("scripts/lib/runner.mjs");
   const required = ["check:", "expect:", "cwd", "shell", "timeoutMs", "maxOutputBytes", "regexTimeoutMs", "platform", "path:"];
   const missing = required.filter(token => !src.includes(token));
   return missing.length ? "approval oracle missing source tokens: " + missing.join(", ") : null;
