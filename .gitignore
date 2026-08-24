@@ -1,0 +1,7 @@
+.unidle/
+.unidle-hook-state.json
+.claude/settings.local.json
+.claude/settings.local.json.unidle.bak
+.claude/settings.json.unidle.bak
+*.tmp
+node_modules/

@@ -1,0 +1,13 @@
+{
+  "name": "unidle",
+  "version": "2.1.0",
+  "private": true,
+  "description": "Recursive task decomposition using full-budget Depth Trees.",
+  "type": "module",
+  "scripts": {
+    "test": "node tests/run-tests.mjs && node tests/hardening-tests.mjs && node tests/stress-tests.mjs && node tests/lint-tests.mjs && node tests/self-check.mjs"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}
