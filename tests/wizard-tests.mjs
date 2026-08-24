@@ -9,8 +9,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseGates } from "../scripts/lib/gates.mjs";
 import { lintDocument } from "../scripts/lib/lint-rules.mjs";
+import { fileURLToPath } from "node:url";
 
-const SCRIPT = new URL("../scripts/wizard.mjs", import.meta.url).pathname;
+const SCRIPT = fileURLToPath(new URL("../scripts/wizard.mjs", import.meta.url));
 
 let passed = 0;
 const failures = [];

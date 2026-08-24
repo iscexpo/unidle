@@ -8,8 +8,9 @@ import * as node_http from "node:http";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const SCRIPT = new URL("../scripts/dashboard.mjs", import.meta.url).pathname;
+const SCRIPT = fileURLToPath(new URL("../scripts/dashboard.mjs", import.meta.url));
 const APPROVAL_ROOT = mkdtempSync(join(tmpdir(), "unidle-test-dashboard-"));
 process.env.UNIDLE_APPROVAL_DIR = APPROVAL_ROOT;
 
