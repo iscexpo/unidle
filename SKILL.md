@@ -92,11 +92,11 @@ Remember that the checker proves only the declared command oracle. It cannot inf
 
 ## Inspect, report, and evolve
 
-Three read-only or offline companions keep the ledger honest without touching state:
+Three companions keep the ledger honest. None of them execute checks; only `gates-diff` writes local files:
 
 - **Live view:** `node <skill-dir>/scripts/dashboard.mjs` serves a loopback-only page with gate trees, evidence trails, timelines, and lease conflicts. It imports the parser, never the runner.
-- **CI reporting:** `gate-report.mjs --summary --pr-comment` publishes status-only PR checks and step summaries; it never executes checks. See [references/github.md](references/github.md).
-- **Ledger evolution:** `gates-diff.mjs diff|invalidate|export|merge` compares ledgers across refactors, invalidates stale evidence, exports audit logs, and consolidates child verification into an integration ledger.
+- **CI reporting:** `gate-report.mjs --summary --step-summary` publishes one status summary (append it to `$GITHUB_STEP_SUMMARY`); `--pr-comment` or `--check-runs` post per-gate results instead — pass exactly one render mode. It never executes checks. See [references/github.md](references/github.md).
+- **Ledger evolution:** `gates-diff.mjs` is offline but writes: `diff` is read-only, while `invalidate`, `export`, and `merge` rewrite or create files by design.
 
 ## Audit the final report
 

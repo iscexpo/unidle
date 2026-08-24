@@ -92,9 +92,17 @@ if (asJson) {
     const who = finding.gate ? finding.gate + ": " : "";
     console.log("  " + label + " " + who + finding.message + "  [" + finding.rule + "]");
   }
-  console.log(findings.length
-    ? "LINT FINDINGS: " + errors.length + " error(s), " + warnings.length + " warning(s)"
-    : "LINT OK");
+  if (!failed) {
+    // Advisory warnings must not break ledgers that require their own quality
+    // via EXPECT: LINT OK; surface them without changing the pass token.
+    console.log("LINT OK");
+    if (warnings.length) {
+      console.log("LINT ADVISORIES: " + warnings.length +
+        " warning(s); advisory unless --strict");
+    }
+  } else {
+    console.log("LINT FINDINGS: " + errors.length + " error(s), " + warnings.length + " warning(s)");
+  }
 }
 
 process.exit(parseFailed ? 2 : failed ? 1 : 0);

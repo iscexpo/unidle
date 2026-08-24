@@ -93,10 +93,10 @@ An unknown `--leaf` is an error. The checker never silently falls back to the fi
 A ledger can declare that it must stay WAITING until gates in other pipelines are met. Declare references before the first gate, in the same region as `OWNS`:
 
 ```markdown
-NEEDS-SCOPE: auth:GATES:g3, infra:gates/leaf-2.1.md:g1
+NEEDS-SCOPE: auth:GATES:g3, infra:leaf-2.1:g1
 ```
 
-Each reference names `<scope>:<ledger-stem>:<gate-id>`. The stem resolves to `.unidle/<scope>/GATES.md` when it is `GATES`, otherwise to `.unidle/<scope>/gates/<stem>.md`. Malformed references, invalid ids, and directives placed after the first gate are parse errors.
+Each reference names `<scope>:<ledger-stem>:<gate-id>`. The stem resolves to `.unidle/<scope>/GATES.md` when it is `GATES`, otherwise to `.unidle/<scope>/gates/<stem>.md`. Stems are bare ids without slashes or extensions. Malformed references, invalid ids, and directives placed after the first gate are parse errors.
 
 Verification is fail-closed and reads live states from disk:
 

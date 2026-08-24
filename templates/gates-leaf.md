@@ -20,7 +20,12 @@ Scope: <one sentence describing the complete deliverable>
   CWD: packages/example
   EVIDENCE: pending
 
-- [ ] G3: <manual outcome that no command can decide>
+- [ ] G3: <regression guard for the behavior most likely to break>
+  CHECK: node scripts/verify-regressions.mjs
+  EXPECT: regression suite passed
+  EVIDENCE: pending
+
+- [ ] G4: <manual outcome that no command can decide>
   EVIDENCE: pending
 
 <!--

@@ -41,6 +41,16 @@ The optional Claude Code Stop hook scans ledgers and writes progress state. It d
 
 Runtime and binding files live under `.unidle/` in scoped mode. Legacy mode may use `.unidle-hook-state.json`. Keep both paths in the project's ignore rules. Session ids in bindings are routing values, not secrets or authentication tokens.
 
+## Dashboard server
+
+`dashboard.mjs` is a local TCP server. It binds `127.0.0.1` by default; `--host` rebinds it to any interface, which exposes pipeline contents — gate text, evidence, status logs, lease owners, absolute paths — to every device that can reach the address. There is no authentication, no encryption, and no origin isolation beyond serving fixed GET routes: any page you visit in the same browser profile can read responses from a loopback dashboard via same-origin fetch of `http://127.0.0.1:<port>`.
+
+Treat the served data as public-to-your-machine. Run it only while inspecting, keep the default loopback bind, and stop it afterwards. The server imports the parser, never the runner, and refuses non-GET methods; it cannot execute checks or write files.
+
+## Wizard previews
+
+The wizard's preview step executes each runnable `CHECK:` immediately after you enter it (or after it is read from `--from-json`) so you can judge its MET/UNMET sample before writing the ledger. Preview execution bypasses the approval ceremony on purpose — nothing is recorded — but it is still arbitrary code running with your permissions. Type or generate CHECK lines only from content you have read. For a spec file authored elsewhere, review every `check` field before passing `--from-json`, or pass `--no-preview` and verify through the checker's normal approval flow instead.
+
 ## Installer targets and privacy
 
 The installer changes Claude Code settings only after explicit invocation:

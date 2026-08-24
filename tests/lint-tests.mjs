@@ -157,6 +157,21 @@ test("lint: a manual gate warns without failing", () => {
   assert.equal(code, 0);
 });
 
+test("lint: advisory warnings keep the LINT OK pass token", () => {
+  const { out, code } = lint(MANUAL);
+  assert.match(out, /^LINT OK$/m);
+  assert.match(out, /LINT ADVISORIES: \d+ warning/);
+  assert.doesNotMatch(out, /LINT FINDINGS/);
+  assert.equal(code, 0);
+});
+
+test("lint: strict failure still reports findings instead of LINT OK", () => {
+  const { out, code } = lint("--strict", MANUAL);
+  assert.match(out, /LINT FINDINGS/);
+  assert.doesNotMatch(out, /^LINT OK$/m);
+  assert.equal(code, 1);
+});
+
 test("lint: strict promotes warnings to failure", () => {
   assert.equal(lint(MANUAL).code, 0);
   assert.equal(lint("--strict", MANUAL).code, 1);
