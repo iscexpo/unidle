@@ -32,7 +32,7 @@ The fenced example above is documentation. Lines inside fenced code blocks are i
 
 ## Strict parsing rules
 
-- Start a gate with `- [ ] ID: outcome` or `- [x] ID: outcome`. Use a non-empty explicit id that is unique within the file. An id-less gate is malformed because line-derived identifiers are not stable when lines move.
+- Start a gate with `- [ ] ID: outcome` or `- [x] ID: outcome`. Use a non-empty, explicit ID that is unique within the file. An ID-less gate is malformed because line-derived identifiers are not stable when lines move.
 - Indent `CHECK:`, `EXPECT:`, `CWD:`, and `EVIDENCE:` beneath their gate. An unindented attribute is diagnosed instead of silently changing the gate into a manual one.
 - Give a runnable gate both `CHECK:` and `EXPECT:`. Give a manual gate neither. A partial runnable gate is malformed.
 - Use one `EVIDENCE:` line per gate. If it is omitted from an otherwise valid gate, the checker inserts it without changing the file's original CRLF or LF newline style.
@@ -76,7 +76,7 @@ Warnings are weaker signals:
 - A slash wrapped literal path silently read as a regular expression, so its dots match any character.
 - A title that names an activity rather than an outcome a stranger could judge.
 - A number in a manual gate title that nothing measures.
-- A ledger outside the five to twelve live gate band.
+- A ledger outside the five-to-twelve live-gate range.
 
 Exit `0` when nothing fails, `1` when something fails, and `2` when the shared parser rejects the ledger, so quality cannot even be judged. Warnings alone stay advisory; `--strict` promotes them to failures. `--json` emits machine-readable findings with file, gate id, rule, and message. A lint finding is a prompt to sharpen the gate, not proof that the outcome is wrong.
 

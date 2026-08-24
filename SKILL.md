@@ -17,7 +17,7 @@ Lint the ledger before working it. The authoring rules are prose, and prose is t
 node <skill-dir>/scripts/gate-lint.mjs GATES.md
 ```
 
-It never executes a `CHECK:`; it reads the ledger and judges its oracles. Errors are oracles that cannot fail: a command whose output is fixed by its own text, and an expectation that appears verbatim inside the command meant to prove it. Warnings are weaker signals: success vocabulary that failure output also prints, a literal path silently read as a regular expression, a title naming an activity rather than an outcome, a number nothing measures, and a ledger outside the five to twelve band. Exit `0` when nothing fails, `1` when something fails, `2` when the shared parser rejected the ledger; warnings stay advisory unless you pass `--strict`. A finding is a prompt to sharpen the gate, not proof the outcome is wrong. Make a ledger require its own quality by linting as a gate:
+It never executes a `CHECK:`; it reads the ledger and judges its oracles. Errors are oracles that cannot fail: a command whose output is fixed by its own text, and an expectation that appears verbatim inside the command meant to prove it. Warnings are weaker signals: success vocabulary that failure output also prints, a literal path silently read as a regular expression, a title naming an activity rather than an outcome, a number nothing measures, and a ledger outside the five-to-twelve range. Exit `0` when nothing fails, `1` when something fails, `2` when the shared parser rejected the ledger; warnings stay advisory unless you pass `--strict`. A finding is a prompt to sharpen the gate, not proof the outcome is wrong. Make a ledger require its own quality by linting as a gate:
 
 ```markdown
 - [ ] G0: this ledger states outcomes that can fail

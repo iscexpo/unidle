@@ -71,7 +71,7 @@ export function lintDocument(doc) {
     }
   }
 
-  // references/gates.md: five to twelve gates per leaf is the useful range.
+  // references/gates.md: five-to-twelve gates per leaf is the useful range.
   if (live.length && live.length < 5) {
     add("warn", null, "thin-ledger",
       live.length + " live gates, under five, which usually means the leaf is under-specified");
