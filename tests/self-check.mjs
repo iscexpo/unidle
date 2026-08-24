@@ -22,6 +22,7 @@ const SCRIPTS = [
   "scripts/install-hooks.mjs",
   "scripts/gate-report.mjs",
   "scripts/gates-diff.mjs",
+  "scripts/dashboard.mjs",
   "scripts/lib/gates.mjs",
   "scripts/lib/regex-worker.mjs",
   "scripts/lib/runner.mjs",

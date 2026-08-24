@@ -90,6 +90,17 @@ Automation cannot prove every user-facing or judgment-heavy outcome. For each ma
 
 Do not call a leaf `VERIFIED` merely because every runnable gate passed.
 
+## Watching a pipeline
+
+For a live, read-only view of every pipeline — gate trees with evidence trails, status timelines, lease claims with conflict flags, and snapshot exports as JSON, markdown, or HTML — run:
+
+```text
+node <skill-dir>/scripts/dashboard.mjs            # http://127.0.0.1:4747
+node <skill-dir>/scripts/dashboard.mjs --port 0   # prints the chosen port
+```
+
+The dashboard binds loopback only, serves GET routes over a fixed table, and imports the parser but never the runner: it cannot execute checks, record approvals, or write anything. Use it to answer "where is the pipeline stuck?" without touching state; keep the CLI as the only way to change it.
+
 ## When not to orchestrate
 
 Stay solo when one focused context can implement and verify the task without hiding independent deliverables. Orchestration has planning and integration overhead; use it for attention isolation, not ceremony.
