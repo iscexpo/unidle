@@ -50,7 +50,13 @@ const OWNS_RE = /^OWNS:\s*(.*)$/;
 const NEEDS_SCOPE_RE = /^NEEDS-SCOPE:\s*(.*)$/;
 const FENCE_OPEN_RE = /^( {0,3})(`{3,}|~{3,})(.*)$/;
 const REGEX_RE = /^\/([\s\S]*)\/([a-z]*)$/;
-const SCOPE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+const SCOPE_SEGMENT_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+// Nested pipelines address as a/b/c under .unidle/. Depth is bounded so a
+// typo can never build an unbounded path.
+const MAX_SCOPE_DEPTH = 8;
+const SCOPE_RE = new RegExp(
+  "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}(?:/[A-Za-z0-9][A-Za-z0-9._-]{0,63}){0," +
+  (MAX_SCOPE_DEPTH - 1) + "}$");
 const REF_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 function parseRegex(expect) {
@@ -277,8 +283,13 @@ export function tail(output, max = 240) {
 
 export function validateScopeId(value, label = "scope") {
   const id = String(value || "");
-  if (!SCOPE_RE.test(id) || id === "." || id === "..") {
-    return label + " must match " + SCOPE_RE + " and cannot be . or ..";
+  if (!SCOPE_RE.test(id)) {
+    return label + " must be 1-" + MAX_SCOPE_DEPTH + " '/'-separated segments matching " +
+      SCOPE_SEGMENT_RE + ": " + id;
+  }
+  const segments = id.split("/");
+  if (segments.includes(".") || segments.includes("..")) {
+    return label + " cannot contain '.' or '..' segments: " + id;
   }
   return null;
 }
@@ -337,13 +348,31 @@ export function listScopes(root) {
   const directory = join(root, UNIDLE_DIR);
   if (!existsSync(directory)) return [];
   try {
-    return readdirSync(directory, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory() && !entry.isSymbolicLink() && entry.name !== "locks" && !validateScopeId(entry.name))
-      .map((entry) => entry.name)
-      .sort();
+    if (!statSync(directory).isDirectory()) return [];
   } catch {
     return [];
   }
+  const found = [];
+  // A directory is a pipeline when it directly holds GATES.md or a gates/
+  // ledger directory. Deeper pipeline directories nest as a/b/c; every path
+  // segment must be a valid scope segment, so stray directories are ignored.
+  const walk = (absolute, id, depth) => {
+    if (depth > MAX_SCOPE_DEPTH) return;
+    let entries = [];
+    try { entries = readdirSync(absolute, { withFileTypes: true }); } catch { return; }
+    let hostsLedger = false;
+    try { if (statSync(join(absolute, "GATES.md")).isFile()) hostsLedger = true; } catch { /* absent */ }
+    try { if (statSync(join(absolute, "gates")).isDirectory()) hostsLedger = true; } catch { /* absent */ }
+    if (id && hostsLedger && !validateScopeId(id)) found.push(id);
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+      if (entry.name === "locks") continue;
+      if (!SCOPE_SEGMENT_RE.test(entry.name)) continue;
+      walk(join(absolute, entry.name), id ? id + "/" + entry.name : entry.name, depth + 1);
+    }
+  };
+  walk(directory, "", 0);
+  return found.sort();
 }
 
 function markdownFiles(directory) {

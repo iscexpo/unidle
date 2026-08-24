@@ -33,7 +33,7 @@ The Stop hook can additionally use the current Claude Code `session_id` binding 
 
 When several scopes exist and none resolves, the checker refuses instead of running every ledger. The Stop hook allows the stop with a diagnostic instead of blocking a session on an unknown pipeline.
 
-Use scope ids that match `[A-Za-z0-9][A-Za-z0-9._-]{0,63}` and are not `.` or `..`. Do not use separators, traversal, or absolute paths.
+Use scope ids made of one to eight `/`-separated segments, each matching `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`. Nested ids address nested pipelines: scope `web/dash` lives at `.unidle/web/dash/`, with its `GATES.md`, `gates/`, `session` binding, and `status.log` inside the deepest directory. Discovery walks `.unidle/` recursively, so a parent directory may be a pipeline, a container of pipelines, or both. Traversal (`.` or `..` segments), empty segments, and deeper than eight levels are rejected. Every id-bearing surface — `--scope`, `NEEDS-SCOPE` references, leases, `--bind`, dashboard routes (URL-encode `/` as `%2F`) — accepts the full nested id as one opaque string; ambiguity rules are unchanged.
 
 ## What a scope isolates
 

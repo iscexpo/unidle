@@ -361,7 +361,9 @@ function commandMerge(oldScope, newScope, options) {
     "",
   ].join("\n");
 
-  const outFile = resolve(root, ".unidle", newScope, "gates", "node-from-" + oldScope + ".md");
+  // Scope ids may nest (a/b), so the filename keeps only id-safe characters.
+  const fileStem = "node-from-" + oldScope.split("/").join("__");
+  const outFile = resolve(root, ".unidle", newScope, "gates", fileStem + ".md");
   if (existsSync(outFile) && !options.force) fail(outFile + " exists; pass --force to regenerate");
   writeAtomic(outFile, body, { root });
   console.log("MERGED " + gates.length + " child ledger(s) into " + outFile);

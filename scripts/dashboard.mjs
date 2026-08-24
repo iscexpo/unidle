@@ -404,8 +404,10 @@ const server = createServer((request, response) => {
       return;
     }
 
-    if ((segments[1] === "scope" || segments[1] === "log" || segments[1] === "export") && segments.length === 3) {
-      const name = segments[2];
+    if ((segments[1] === "scope" || segments[1] === "log" || segments[1] === "export") && segments.length >= 3) {
+      // Nested pipeline ids contain '/', so every remaining path segment
+      // rejoins into one id; validateScopeId still rejects traversal.
+      const name = segments.slice(2).join("/");
       const invalid = validateScopeId(name);
       if (invalid || !listScopes(root).includes(name)) { notFound(response, "no such pipeline"); return; }
 

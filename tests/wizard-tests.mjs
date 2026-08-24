@@ -186,7 +186,7 @@ const notWritten = (scope) => !existsSync(ledgerFor(scope));
 
 // --- usage failures exit 2 without touching disk
 check("invalid scope id exits 2",
-  runWizard({ scope: "bad/id", owns: [], needsScope: [], gates: [{ id: "m1", title: "t" }] }).status === 2);
+  runWizard({ scope: "bad//id", owns: [], needsScope: [], gates: [{ id: "m1", title: "t" }] }).status === 2);
 check("an existing pipeline is refused instead of recreated",
   (() => {
     const result = runWizard({ scope: "auth", owns: [], needsScope: [], gates: [{ id: "m1", title: "t" }] });
