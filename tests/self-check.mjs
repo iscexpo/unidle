@@ -20,6 +20,7 @@ const SCRIPTS = [
   "scripts/gate-lint.mjs",
   "scripts/stop-hook.mjs",
   "scripts/install-hooks.mjs",
+  "scripts/gate-report.mjs",
   "scripts/lib/gates.mjs",
   "scripts/lib/regex-worker.mjs",
   "scripts/lib/runner.mjs",
