@@ -217,7 +217,8 @@ test("parser: fenced examples are ignored and CRLF plus missing EVIDENCE are pre
     lacks(result.out, "BAD:");
     const after = s.read("GATES.md");
     has(after, "- [x] G1: real\r\n");
-    has(after, "EVIDENCE: exit=0;");
+    has(after, "EVIDENCE: ");
+    has(after, "exit=0;");
     assert(!/(^|[^\r])\n/.test(after), "write introduced bare LF");
   } finally { s.cleanup(); }
 });

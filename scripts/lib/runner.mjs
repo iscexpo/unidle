@@ -3,9 +3,37 @@
 
 import { spawn } from "node:child_process";
 import { Worker } from "node:worker_threads";
+import { statSync } from "node:fs";
+import { delimiter, isAbsolute, join, resolve } from "node:path";
 
 export const MAX_OUTPUT_BYTES = 1024 * 1024;
 export const REGEX_TIMEOUT_MS = 250;
+export const DEFAULT_TIMEOUT_SECONDS = 120;
+
+function executableCandidates(name) {
+  if (process.platform !== "win32") return [name];
+  if (/\.[A-Za-z0-9]+$/.test(name)) return [name];
+  const extensions = (process.env.PATHEXT || ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean);
+  return [name, ...extensions.map((extension) => name + extension.toLowerCase()), ...extensions.map((extension) => name + extension.toUpperCase())];
+}
+
+// Resolve the command shell exactly the way the checker does, so reporting
+// and audit tools describe the same execution surface. Throws when unresolvable.
+export function resolveShellOrThrow(raw) {
+  const requested = raw || process.env.UNIDLE_SHELL || (process.platform === "win32" ? (process.env.ComSpec || "cmd.exe") : "/bin/sh");
+  const containsSeparator = requested.includes("/") || requested.includes("\\") || isAbsolute(requested);
+  const candidates = [];
+  if (containsSeparator) candidates.push(resolve(process.cwd(), requested));
+  else {
+    for (const directory of String(process.env.PATH || "").split(delimiter).filter(Boolean)) {
+      for (const name of executableCandidates(requested)) candidates.push(join(directory, name));
+    }
+  }
+  for (const candidate of candidates) {
+    try { if (statSync(candidate).isFile()) return candidate; } catch { /* keep looking */ }
+  }
+  throw new Error("cannot resolve command shell " + JSON.stringify(requested) + " from PATH");
+}
 
 // The approval identity hashes this exact object, key order included, so any
 // change to its shape re-keys every existing approval by design.

@@ -1,6 +1,4 @@
 # unidle
-Recursive task decomposition using full-budget Depth Trees.
-# unidle
 
 ## Make incomplete work visible. Make completion testable.
 
@@ -19,14 +17,14 @@ Recursive task decomposition using full-budget Depth Trees.
 </p>
 
 ```mermaid
-flowchart LR
-		A[Write outcomes] --> B[Build Depth Tree]
-		B --> C[Claim ownership]
-		C --> D[Run approved checks]
-		D --> E[Record evidence]
-		E --> F[Re-verify]
-		F --> G[Integrate and report]
-		F -. stale evidence .-> D
+graph LR
+    A[Write outcomes] --> B[Build Depth Tree]
+    B --> C[Claim ownership]
+    C --> D[Run approved checks]
+    D --> E[Record evidence]
+    E --> F[Re-verify]
+    F --> G[Integrate and report]
+    F -.->|stale evidence| D
 ```
 
 ## The problem

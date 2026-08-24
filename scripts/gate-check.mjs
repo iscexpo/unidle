@@ -14,7 +14,7 @@ import {
   hookStatePath, listScopes, parseGates, qualify, releaseLeases, resolveTarget,
   scopeRoot, sha256, sleep, tail, validateScopeId, withFileLock, writeAtomic,
 } from "./lib/gates.mjs";
-import { createOracle, createRunner } from "./lib/runner.mjs";
+import { createOracle, createRunner, DEFAULT_TIMEOUT_SECONDS, resolveShellOrThrow } from "./lib/runner.mjs";
 
 const HELP = `usage: gate-check.mjs [options] [file ...]
 
@@ -55,7 +55,6 @@ const VALUE_OPTIONS = new Set([
   "--scope", "--leaf", "--timeout", "--jobs", "--cwd", "--root",
   "--log", "--bind", "--shell",
 ]);
-const DEFAULT_TIMEOUT_SECONDS = 120;
 
 function parseArgs(argv) {
   const options = {};
@@ -268,30 +267,10 @@ if (action === "--claim" || action === "--release") {
 
 let ledgers = target.files.map(loadLedger);
 
-function executableCandidates(name) {
-  if (process.platform !== "win32") return [name];
-  if (/\.[A-Za-z0-9]+$/.test(name)) return [name];
-  const extensions = (process.env.PATHEXT || ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean);
-  return [name, ...extensions.map((extension) => name + extension.toLowerCase()), ...extensions.map((extension) => name + extension.toUpperCase())];
-}
-
-function resolveShell(raw) {
-  const requested = raw || process.env.UNIDLE_SHELL || (process.platform === "win32" ? (process.env.ComSpec || "cmd.exe") : "/bin/sh");
-  const containsSeparator = requested.includes("/") || requested.includes("\\") || isAbsolute(requested);
-  const candidates = [];
-  if (containsSeparator) candidates.push(resolve(process.cwd(), requested));
-  else {
-    for (const directory of String(process.env.PATH || "").split(delimiter).filter(Boolean)) {
-      for (const name of executableCandidates(requested)) candidates.push(join(directory, name));
-    }
-  }
-  for (const candidate of candidates) {
-    try { if (statSync(candidate).isFile()) return candidate; } catch { /* keep looking */ }
-  }
-  failUsage("cannot resolve command shell " + JSON.stringify(requested) + " from PATH");
-}
-
-const shell = opt.status ? "(not used: status mode)" : resolveShell(opt.shell);
+const shell = opt.status ? "(not used: status mode)" : (() => {
+  try { return resolveShellOrThrow(opt.shell); }
+  catch (error) { failUsage(error.message); }
+})();
 const pathValue = String(process.env.PATH || "");
 const pathHash = sha256(pathValue).slice(0, 12);
 const pathCount = pathValue ? pathValue.split(delimiter).length : 0;
@@ -452,8 +431,10 @@ function failureOutput(output, max = 480) {
 
 function evidenceFor(result) {
   const clean = (value) => String(value).replace(/[\r\n]+/g, " ");
-  return ("exit=0; shell=" + clean(shell) + "; cwd=" + clean(result.cwd) +
-    "; path=" + pathEvidence + "; output=" + clean(tail(result.output))).slice(0, 900);
+  // The timestamp documents when the oracle ran; it is not part of the
+  // approval signature, so existing approvals stay valid across this format.
+  return ("at=" + new Date().toISOString() + "; exit=0; shell=" + clean(shell) +
+    "; cwd=" + clean(result.cwd) + "; path=" + pathEvidence + "; output=" + clean(tail(result.output))).slice(0, 900);
 }
 
 function insertOrUpdateEvidence(doc, gate, value) {
