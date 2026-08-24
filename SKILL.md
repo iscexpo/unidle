@@ -32,6 +32,12 @@ Treat `CHECK:` as code. Before executing an inherited ledger, parse it without r
 node <skill-dir>/scripts/gate-check.mjs --status GATES.md
 ```
 
+For a new pipeline, prefer guided authoring over hand-editing; it fail-closes on bad ownership globs, dangling dependency references, and unlintable drafts:
+
+```text
+node <skill-dir>/scripts/wizard.mjs
+```
+
 Approve only commands you wrote or understand, then run them explicitly:
 
 ```text
@@ -49,6 +55,8 @@ Do not silently remove an impossible gate. Add `ABANDON: <id> <non-empty reason>
 - **Solo:** Use one `GATES.md` for a focused task that fits one working session.
 - **Orchestrated:** For a build or deep review, read [references/method.md](references/method.md) and [references/orchestration.md](references/orchestration.md). Write the contract and tree before fan-out. Give every leaf and branch its own gates file.
 - **Parallel:** Before dispatching concurrent leaves or pipelines, also read [references/parallel.md](references/parallel.md). Declare disjoint `OWNS:` paths and claim them. Treat scopes and leases as coordination, never as filesystem isolation or a security boundary.
+
+Pipelines can wait on each other: a ledger declaring `NEEDS-SCOPE: <scope>:<stem>:<gate>` stays WAITING until those foreign gates are met, and `gate-check.mjs --scope-tree` renders every pipeline with its dependency edges and cycle warnings. Scope ids nest (`web/dash` lives at `.unidle/web/dash/`), so decomposition depth is not limited to one level. The rules are in [references/parallel.md](references/parallel.md).
 
 Keep check execution sequential by default. Use `--jobs <N>` only for independent runnable gates when deterministic parallel verification saves wall-clock time. Continue printing and recording results in gate order.
 
@@ -81,6 +89,14 @@ Remember that the checker proves only the declared command oracle. It cannot inf
 - Review consequential manual gates with evidence proportional to risk. Try to make the riskiest outcome runnable, but do not claim that manual status and risk generally correlate.
 - Prefer portable Node scripts. Do not assume `grep`, `tail`, or `tr` exists on stock Windows.
 - Re-run with the same declared shell and required toolchain. Treat an environment mismatch as a failed verification, not as evidence.
+
+## Inspect, report, and evolve
+
+Three read-only or offline companions keep the ledger honest without touching state:
+
+- **Live view:** `node <skill-dir>/scripts/dashboard.mjs` serves a loopback-only page with gate trees, evidence trails, timelines, and lease conflicts. It imports the parser, never the runner.
+- **CI reporting:** `gate-report.mjs --summary --pr-comment` publishes status-only PR checks and step summaries; it never executes checks. See [references/github.md](references/github.md).
+- **Ledger evolution:** `gates-diff.mjs diff|invalidate|export|merge` compares ledgers across refactors, invalidates stale evidence, exports audit logs, and consolidates child verification into an integration ledger.
 
 ## Audit the final report
 
