@@ -1,6 +1,6 @@
 {
   "name": "unidle",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "description": "Recursive task decomposition using full-budget Depth Trees.",
   "type": "module",
