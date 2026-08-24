@@ -8,12 +8,13 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   claimLeases, listScopes, parseGates, readLeases, releaseLeases,
   statusLogPath, validateScopeId,
 } from "../scripts/lib/gates.mjs";
 
-const ROOT = "/workspaces/unidle";
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const APPROVAL_DIR = mkdtempSync(join(tmpdir(), "unidle-test-nested-approvals-"));
 process.env.UNIDLE_APPROVAL_DIR = APPROVAL_DIR;
 
